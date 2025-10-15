@@ -133,9 +133,23 @@ def create_train_test(df, test_ratio=0.2):
     df = df.copy()
 
     df['stratify_col'] = df['activityID'].astype(str) + "_" + df['PeopleId'].astype(str)
-
-    dftrain, dftest = train_test_split(df, test_size=test_ratio,
-                                       stratify=df['stratify_col'],
-                                       random_state=42)
+    
+    stratify_counts = df['stratify_col'].value_counts()
+    min_count = stratify_counts.min()
+    
+    if min_count < 2:
+        activity_counts = df['activityID'].value_counts()
+        activity_min_count = activity_counts.min()
+        
+        if activity_min_count < 2:
+            dftrain, dftest = train_test_split(df, test_size=test_ratio, random_state=42, shuffle=True)
+        else:
+            dftrain, dftest = train_test_split(df, test_size=test_ratio,
+                                               stratify=df['activityID'],
+                                               random_state=42, shuffle=True)
+    else:
+        dftrain, dftest = train_test_split(df, test_size=test_ratio,
+                                           stratify=df['stratify_col'],
+                                           random_state=42, shuffle=True)
     
     return dftrain.drop(columns=['stratify_col']), dftest.drop(columns=['stratify_col'])
