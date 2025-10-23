@@ -16,7 +16,7 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_percenta
 import math
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
-
+import random
 def load_data():
 
     filename = "activity_dataset.csv"
@@ -97,10 +97,7 @@ def prepare_for_train(df_train, df_test):
         "chest magnetometer X",
         "chest magnetometer Y",
         "chest magnetometer Z",
-        "ankle temperature (°C)",
-        "ankle acceleration X ±16g",
-        "ankle acceleration Y ±16g",
-        "ankle acceleration Z ±16g",
+        "ankle temperature (°C)",   
         "ankle gyroscope X",
         "ankle gyroscope Y",
         "ankle gyroscope Z",
@@ -129,7 +126,16 @@ def prepare_for_train(df_train, df_test):
     return X_train_final, y_train, X_test_final, y_test
 
 
+def train_dev_split(X, y, ratio):
+    n = len(X)
+    ind_dev = np.asarray(random.sample(range(n), int(n*ratio)))
+    ind_train = np.asarray(list(set(range(n)) - set(ind_dev)))
+
+    return X[ind_train], y[ind_train], X[ind_dev], y[ind_dev]
+
 def create_train_test(df, test_ratio=0.2):
+    
+    
     df = df.copy()
 
     df['stratify_col'] = df['activityID'].astype(str) + "_" + df['PeopleId'].astype(str)
