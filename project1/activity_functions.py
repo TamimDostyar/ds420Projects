@@ -1,3 +1,4 @@
+from io import StringIO
 from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
 import pandas as pd
 import kagglehub
@@ -159,3 +160,65 @@ def create_train_test(df, test_ratio=0.2):
                                            random_state=42, shuffle=True)
     
     return dftrain.drop(columns=['stratify_col']), dftest.drop(columns=['stratify_col'])
+
+
+def get_KNeighbors_scores():
+    scores = """
+    Accuracy	F1_Score	Recall	Precision
+    0.996173	0.996299	0.996388	0.996213
+    """
+
+    report = """
+    precision    recall  f1-score   support
+
+    Nordic walking       1.00      1.00      1.00     37621
+    ascending stairs       0.99      0.99      0.99     23443
+    cycling       1.00      1.00      1.00     32920
+    descending stairs       0.99      0.98      0.99     20989
+    ironing       1.00      1.00      1.00     47738
+    lying       1.00      1.00      1.00     38505
+    rope jumping       1.00      1.00      1.00      8594
+    running       1.00      1.00      1.00     19640
+    sitting       1.00      1.00      1.00     37038
+    standing       1.00      1.00      1.00     37986
+    transient activities       1.00      0.99      0.99    185515
+    vacuum cleaning       1.00      1.00      1.00     35071
+    walking       0.99      1.00      0.99     47752
+    """
+
+    KNeighbors_report = pd.read_csv(StringIO(report), sep=r"\s{2,}", engine="python")
+
+    KNeighbors_scores = pd.read_csv(StringIO(scores), sep="\t")
+    
+    return KNeighbors_scores, KNeighbors_report
+
+
+def get_DecisionTree_scores():
+    scores = """
+    Accuracy	F1_Score	Recall	Precision
+    0.996971	0.996741	0.99668	0.996802
+    """
+
+    report = """
+                          precision    recall  f1-score   support
+
+      Nordic walking       1.00      1.00      1.00     37621
+    ascending stairs       0.99      0.99      0.99     23443
+             cycling       1.00      1.00      1.00     32920
+   descending stairs       0.99      0.99      0.99     20989
+             ironing       1.00      1.00      1.00     47738
+               lying       1.00      1.00      1.00     38505
+        rope jumping       1.00      0.99      0.99      8594
+             running       1.00      1.00      1.00     19640
+             sitting       1.00      1.00      1.00     37038
+            standing       1.00      1.00      1.00     37986
+transient activities       1.00      1.00      1.00    185515
+     vacuum cleaning       1.00      1.00      1.00     35071
+             walking       1.00      1.00      1.00     47752
+    """
+
+    DecisionTree_report = pd.read_csv(StringIO(report), sep=r"\s{2,}", engine="python")
+
+    DecisionTree_scores = pd.read_csv(StringIO(scores), sep="\t")
+    
+    return DecisionTree_scores, DecisionTree_report
