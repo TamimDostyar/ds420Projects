@@ -18,6 +18,12 @@ import math
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 import random
+
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import keras_tuner as kt
+
+
 def load_data():
 
     filename = "activity_dataset.csv"
@@ -160,3 +166,70 @@ def create_train_test(df, test_ratio=0.2):
                                            random_state=42, shuffle=True)
     
     return dftrain.drop(columns=['stratify_col']), dftest.drop(columns=['stratify_col'])
+
+
+# below is for DNN
+
+def build_model(hp):
+  n_hidden = hp.Int("n_hidden", min_value=2, max_value=8, default=2)
+  learning_rate = hp.Float("learning_rate", min_value=1e-4, max_value=1e-2, step = 5,
+                                  sampling="log")
+  optimizer = hp.Choice("optimizer", values=["sgd", "RMSprop", "adam"])
+
+  if optimizer == "sgd":
+    optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
+  elif optimizer == "RMSprop":
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+  else:
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
+  model = tf.keras.Sequential()
+  model.add(tf.keras.layers.Flatten())
+  for _ in range(n_hidden):
+    model.add(tf.keras.layers.Dense(units = hp.Int("n_neurons", min_value=100,
+                                                   max_value=400, step = 100),
+                                    activation=hp.Choice("activation", values = ["relu", "tanh", "selu"])))
+
+  model.add(tf.keras.layers.Dense(13, activation="softmax"))
+  model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer,
+                        metrics=["accuracy"])
+  return model
+
+
+# 1D CNN for DNN2
+def build_model_cnn(hp):
+  n_conv_layers = hp.Int("n_conv_layers", min_value=1, max_value=3, default=2)
+  learning_rate = hp.Float("learning_rate", min_value=1e-4, max_value=1e-2, sampling="log")
+  optimizer_choice = hp.Choice("optimizer", values=["sgd", "RMSprop", "adam"])
+
+  if optimizer_choice == "sgd":
+    optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
+  elif optimizer_choice == "RMSprop":
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+  else:
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
+  model = tf.keras.Sequential()
+  
+  model.add(tf.keras.layers.Reshape((-1, 1)))
+  
+  for i in range(n_conv_layers):
+    model.add(tf.keras.layers.Conv1D(
+        filters=hp.Int(f"filters_{i}", min_value=32, max_value=128, step=32),
+        kernel_size=hp.Int(f"kernel_size_{i}", min_value=2, max_value=5),
+        activation=hp.Choice("activation", values=["relu", "tanh", "selu"]),
+        padding="same"
+    ))
+    model.add(tf.keras.layers.MaxPooling1D(pool_size=2, padding="same"))
+  
+  model.add(tf.keras.layers.Flatten())
+  model.add(tf.keras.layers.Dense(
+      units=hp.Int("dense_units", min_value=64, max_value=256, step=64),
+      activation=hp.Choice("dense_activation", values=["relu", "tanh"])
+  ))
+  model.add(tf.keras.layers.Dropout(hp.Float("dropout", min_value=0.1, max_value=0.5, step=0.1)))
+  
+  model.add(tf.keras.layers.Dense(13, activation="softmax"))
+  model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer,
+                metrics=["accuracy"])
+  return model
