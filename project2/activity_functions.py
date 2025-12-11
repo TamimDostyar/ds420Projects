@@ -23,7 +23,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import keras_tuner as kt
 
-
+from tensorflow.keras import regularizers
 def load_data():
 
     filename = "activity_dataset.csv"
@@ -166,70 +166,183 @@ def create_train_test(df, test_ratio=0.2):
                                            random_state=42, shuffle=True)
     
     return dftrain.drop(columns=['stratify_col']), dftest.drop(columns=['stratify_col'])
+ 
+def build_model_dnn(hp):
+    learning_rate = hp.Float("learning_rate", 1e-4, 1e-2, sampling="log")
+    optimizer_choice = hp.Choice("optimizer", ["sgd", "rmsprop", "adam"])
+    dropout_rate = hp.Float("dropout", 0.1, 0.5, step=0.05)
+    weight_decay = hp.Choice("weight_decay", [1e-3, 1e-4])
+    n_hidden = hp.Int("n_hidden", 5, 7)
+
+    if optimizer_choice == "sgd":
+        optimizer = tf.keras.optimizers.SGD(learning_rate)
+    elif optimizer_choice == "rmsprop":
+        optimizer = tf.keras.optimizers.RMSprop(learning_rate)
+    else:
+        optimizer = tf.keras.optimizers.Adam(learning_rate)
+
+    model = tf.keras.Sequential()
+    model.add(tf.keras.layers.Input(shape=(35,)))
+
+    for _ in range(n_hidden):
+        model.add(tf.keras.layers.Dense(
+            units=hp.Int("units", 64, 256, step=64),
+            activation="relu",
+            kernel_regularizer=tf.keras.regularizers.L2(weight_decay)
+        ))
+        model.add(tf.keras.layers.Dropout(dropout_rate))
+
+    model.add(tf.keras.layers.Dense(13, activation="softmax"))
+
+    model.compile(
+        optimizer=optimizer,
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"]
+    )
+
+    return model
 
 
-# below is for DNN
-
-def build_model(hp):
-  n_hidden = hp.Int("n_hidden", min_value=2, max_value=8, default=2)
-  learning_rate = hp.Float("learning_rate", min_value=1e-4, max_value=1e-2, step = 5,
-                                  sampling="log")
-  optimizer = hp.Choice("optimizer", values=["sgd", "RMSprop", "adam"])
-
-  if optimizer == "sgd":
-    optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
-  elif optimizer == "RMSprop":
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
-  else:
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-
-  model = tf.keras.Sequential()
-  model.add(tf.keras.layers.Flatten())
-  for _ in range(n_hidden):
-    model.add(tf.keras.layers.Dense(units = hp.Int("n_neurons", min_value=100,
-                                                   max_value=400, step = 100),
-                                    activation=hp.Choice("activation", values = ["relu", "tanh", "selu"])))
-
-  model.add(tf.keras.layers.Dense(13, activation="softmax"))
-  model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer,
-                        metrics=["accuracy"])
-  return model
-
-
-# 1D CNN for DNN2
 def build_model_cnn(hp):
-  n_conv_layers = hp.Int("n_conv_layers", min_value=1, max_value=3, default=2)
-  learning_rate = hp.Float("learning_rate", min_value=1e-4, max_value=1e-2, sampling="log")
-  optimizer_choice = hp.Choice("optimizer", values=["sgd", "RMSprop", "adam"])
+    learning_rate = hp.Float("learning_rate", 1e-4, 1e-2, sampling="log")
+    optimizer_choice = hp.Choice("optimizer", ["sgd", "rmsprop", "adam"])
+    weight_decay = hp.Choice("weight_decay", [1e-3, 1e-4])
+    dropout_rate = hp.Float("dropout", 0.1, 0.5, step=0.1)
 
-  if optimizer_choice == "sgd":
-    optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
-  elif optimizer_choice == "RMSprop":
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
-  else:
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    n_conv_layers = hp.Int("n_conv_layers", 1, 3)
+    n_dense_layers = hp.Int("n_dense_layers", 1, 3)
 
-  model = tf.keras.Sequential()
-  
-  model.add(tf.keras.layers.Reshape((-1, 1)))
-  
-  for i in range(n_conv_layers):
-    model.add(tf.keras.layers.Conv1D(
-        filters=hp.Int(f"filters_{i}", min_value=32, max_value=128, step=32),
-        kernel_size=hp.Int(f"kernel_size_{i}", min_value=2, max_value=5),
-        activation=hp.Choice("activation", values=["relu", "tanh", "selu"]),
-        padding="same"
-    ))
-    model.add(tf.keras.layers.MaxPooling1D(pool_size=2, padding="same"))
-  
-  model.add(tf.keras.layers.Flatten())
-  model.add(tf.keras.layers.Dense(
-      units=hp.Int("dense_units", min_value=64, max_value=256, step=64),
-      activation=hp.Choice("dense_activation", values=["relu", "tanh"])
-  ))
-  model.add(tf.keras.layers.Dropout(hp.Float("dropout", min_value=0.1, max_value=0.5, step=0.1)))
-  
-  model.add(tf.keras.layers.Dense(13, activation="softmax"))
-  model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer,
-                metrics=["accuracy"])
-  return model
+    if optimizer_choice == "sgd":
+        optimizer = tf.keras.optimizers.SGD(learning_rate)
+    elif optimizer_choice == "rmsprop":
+        optimizer = tf.keras.optimizers.RMSprop(learning_rate)
+    else:
+        optimizer = tf.keras.optimizers.Adam(learning_rate)
+
+    model = tf.keras.Sequential()
+    model.add(tf.keras.layers.Input(shape=(35,)))
+    model.add(tf.keras.layers.Reshape((35, 1)))
+
+    for i in range(n_conv_layers):
+        model.add(tf.keras.layers.Conv1D(
+            filters=hp.Int(f"filters_{i}", 32, 128, step=32),
+            kernel_size=hp.Int(f"kernel_{i}", 2, 5),
+            padding="same",
+            activation="relu",
+            kernel_regularizer=tf.keras.regularizers.L2(weight_decay)
+        ))
+        model.add(tf.keras.layers.MaxPooling1D(pool_size=2))
+
+    model.add(tf.keras.layers.Flatten())
+
+    for _ in range(n_dense_layers):
+        model.add(tf.keras.layers.Dense(
+            units=hp.Int("dense_units", 64, 256, step=64),
+            activation="relu",
+            kernel_regularizer=tf.keras.regularizers.L2(weight_decay)
+        ))
+        model.add(tf.keras.layers.Dropout(dropout_rate))
+
+    model.add(tf.keras.layers.Dense(13, activation="softmax"))
+
+    model.compile(
+        optimizer=optimizer,
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"]
+    )
+
+    return model
+
+
+
+def final_build_dnn1():
+    LEARNING_RATE = 0.0001855349762763219
+    N_HIDDEN = 8
+    UNITS = 256
+    WEIGHT_DECAY = 0.001
+    
+    model = models.Sequential()
+    
+    model.add(layers.Input(shape=(35,)))
+
+    for i in range(N_HIDDEN):
+        model.add(layers.Dense(
+            units=UNITS,
+            activation="relu",
+            kernel_regularizer=regularizers.L2(WEIGHT_DECAY)
+        ))
+
+        calculated_dropout = 0.05 + (0.01 * i)
+        
+        final_dropout = min(calculated_dropout, 0.10)
+        
+        model.add(layers.Dropout(final_dropout))
+        
+
+
+    model.add(layers.Dense(13, activation="softmax"))
+
+    model.compile(
+        optimizer=optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"]
+    )
+
+    return model
+
+
+
+def final_build_dnn2():
+    LEARNING_RATE = 0.0007187981375915335
+    WEIGHT_DECAY = 0.0001
+    DROPOUT_RATE = 0.1
+    N_CONV_LAYERS = 3
+    N_DENSE_LAYERS = 3
+    
+    CONV_PARAMS = [
+        {'filters': 32, 'kernel_size': 2},
+        {'filters': 128, 'kernel_size': 5},
+        {'filters': 64, 'kernel_size': 5},
+    ]
+    
+    DENSE_UNITS = 256
+    
+    model = models.Sequential()
+    
+    model.add(layers.Input(shape=(35,)))
+    
+    model.add(layers.Reshape((35, 1))) 
+
+    for i in range(N_CONV_LAYERS):
+        params = CONV_PARAMS[i]
+        
+        model.add(layers.Conv1D(
+            filters=params['filters'],
+            kernel_size=params['kernel_size'],
+            padding="same",
+            activation="relu",
+            kernel_regularizer=regularizers.L2(WEIGHT_DECAY)
+        ))
+        
+        model.add(layers.MaxPooling1D(pool_size=2))
+    
+    model.add(layers.Flatten())
+
+    for _ in range(N_DENSE_LAYERS):
+        model.add(layers.Dense(
+            units=DENSE_UNITS,
+            activation="relu",
+            kernel_regularizer=regularizers.L2(WEIGHT_DECAY)
+        ))
+        
+        model.add(layers.Dropout(DROPOUT_RATE))
+
+    model.add(layers.Dense(13, activation="softmax"))
+
+    model.compile(
+        optimizer=optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"]
+    )
+
+    return model
